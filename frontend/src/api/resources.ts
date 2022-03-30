@@ -79,7 +79,7 @@ export const kubernetes = {
   node: "nodes.v1",
   cluster: `clusters.${capiVersion}.cluster.x-k8s.io`,
   machine: `machines.${capiVersion}.cluster.x-k8s.io`,
-  sideroServers: "servers.v1alpha1.metal.sidero.dev",
+  sideroServers: "servers.v1alpha2.metal.sidero.dev",
   crd: "customresourcedefinitions.v1.apiextensions.k8s.io",
 };
 

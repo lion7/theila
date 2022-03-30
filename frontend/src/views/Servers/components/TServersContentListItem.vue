@@ -1,6 +1,6 @@
 <template>
   <li class="list__heading-item" :class="{ opened: isDropdownOpened }">
-    <t-slide-down-wrapper :maxHeight="150" :isSliderOpened="isDropdownOpened">
+    <t-slide-down-wrapper :maxHeight="250" :isSliderOpened="isDropdownOpened">
       <template v-slot:head>
         <div class="list__item-top">
           <t-icon
@@ -11,10 +11,11 @@
           />
           <div class="list__item-data">
             <p class="list__item-name">{{ item?.metadata?.uid }}</p>
-            <p v-if="item?.spec?.system" class="list__item-description">
-              <span>{{ item?.spec?.system?.manufacturer }}&nbsp;</span>
-              <span>{{ item?.spec?.system?.productName }}&nbsp;</span>
-              <span>{{ cpu }}</span>
+            <p v-if="item?.spec?.hardware" class="list__item-description">
+              <span v-if="item.spec.hardware.system">{{ item.spec.hardware.system.manufacturer }} {{ item.spec.hardware.system.productName }}</span>
+              <span v-if="item.spec.hardware.compute">, {{ item.spec.hardware.compute.totalCoreCount }} CPUs</span>
+              <span v-if="item.spec.hardware.memory">, {{ item.spec.hardware.memory.totalSize }} RAM</span>
+              <span v-if="item.spec.hardware.storage">, {{ item.spec.hardware.storage.totalSize }} storage</span>
             </p>
           </div>
           <div class="list__item-created">{{ created }}</div>
@@ -44,27 +45,36 @@
       </template>
       <template v-slot:body>
         <div class="list__item-bottom">
-          <div class="list__item-labels">
-            <p v-if="item?.metadata?.labels" class="list__item-label-title">
-              Labels
+          <div class="list__item-bottom-hardware">
+            <p class="list__item-bottom-hardware-title">Hardware</p>
+            <p class="list__item-bottom-hardware-description">
+              <span>Hostname: {{ item?.spec?.hostname }}<br/></span>
+              <template v-if="item?.spec?.hardware?.compute">
+                <span v-bind:key="index" v-for="(cpu, index) in item.spec.hardware.compute.processors">
+                  CPU {{index}}: {{ cpu.manufacturer }} {{cpu.productName}} ({{cpu.coreCount}} cores @ {{cpu.speed}} MHz, {{cpu.threadCount}} threads)<br/>
+                </span>
+              </template>
+              <template v-if="item?.spec?.hardware?.memory">
+                <span v-bind:key="index" v-for="(mem, index) in item.spec.hardware.memory.modules">
+                  Memory module {{index}}: {{mem.size}} MB {{mem.type}} @ {{mem.speed}} Mhz<br/>
+                </span>
+              </template>
+              <template v-if="item?.spec?.hardware?.storage">
+                <span v-bind:key="index" v-for="(dev, index) in item.spec.hardware.storage.devices">
+                  Storage device {{dev.deviceName}}: {{dev.size / 1024 / 1024 / 1024}} GB {{dev.type}}<br/>
+                </span>
+              </template>
+              <template v-if="item?.spec?.hardware?.network">
+                <span v-bind:key="index" v-for="(ifc, index) in item.spec.hardware.network.interfaces.filter(value => value.mac && value.addresses)">
+                  Network interface {{ifc.mac}}: {{ifc.addresses}}<br/>
+                </span>
+              </template>
             </p>
-            <t-tag
-              v-for="(value, key, index) in item?.metadata?.labels"
-              :key="index"
-              class="list__item-label"
-              :name="key + ':' + value"
-            />
           </div>
 
           <div class="list__item-bottom-accepted">
             <p class="list__item-bottom-accepted-title">Accepted</p>
             <t-status :title="item?.spec?.accepted ? 'True' : 'False'" />
-          </div>
-          <div class="list__item-bottom-hostname">
-            <p class="list__item-bottom-hostname-title">Hostname</p>
-            <p class="list__item-hostname-description">
-              {{ item?.spec?.hostname }}
-            </p>
           </div>
           <div class="list__item-bottom-clean">
             <p class="list__item-bottom-clean-title">Clean</p>
@@ -75,7 +85,16 @@
           <div class="list__item-bottom-allocated">
             <p class="list__item-bottom-allocated-title">Allocated</p>
             <t-status
-              :title="item?.status && item?.status?.inUse ? 'True' : 'False'"
+                :title="item?.status && item?.status?.inUse ? 'True' : 'False'"
+            />
+          </div>
+          <div class="list__item-labels">
+            <p class="list__item-label-title">Labels</p>
+            <t-tag
+              v-for="(value, key, index) in item?.metadata?.labels"
+              :key="index"
+              class="list__item-label"
+              :name="key + ':' + value"
             />
           </div>
         </div>
@@ -112,13 +131,9 @@ export default {
         .setLocale("eng")
         .toRelative();
     });
-    const cpu = computed(() => {
-      return (item.value!["spec"]["cpu"] || {})["version"];
-    });
     return {
       isDropdownOpened,
       created,
-      cpu,
       acceptServer: async () => {
         if (item.value!["spec"]["accepted"]) return;
 
@@ -190,9 +205,6 @@ export default {
   @apply text-xs text-naturals-N9 overflow-ellipsis overflow-hidden whitespace-nowrap w-full;
   padding-top: 6px;
 }
-.list__item-hostname-description {
-  @apply text-xs text-naturals-N9 overflow-ellipsis overflow-hidden whitespace-nowrap w-full;
-}
 .list__item-created {
   @apply text-xs text-naturals-N9;
   width: 19.8%;
@@ -221,9 +233,21 @@ export default {
   @apply flex pl-7 w-full;
   padding: 26px 24px 0 28px;
 }
-.list__item-labels {
+.list__item-bottom-hardware {
   @apply flex flex-col;
   width: 39.6%;
+}
+.list__item-bottom-hardware-title {
+  @apply text-xs text-naturals-N12;
+  margin-bottom: 9px;
+}
+.list__item-bottom-hardware-description {
+  @apply text-xs text-naturals-N9 overflow-ellipsis overflow-hidden whitespace-nowrap w-full;
+  width: fit-content;
+}
+.list__item-labels {
+  @apply flex flex-col;
+  /*width: 39.6%;*/
 }
 .list__item-label-title {
   @apply text-xs text-naturals-N12;
@@ -241,17 +265,9 @@ export default {
   @apply text-xs text-naturals-N12;
   margin-bottom: 9px;
 }
-.list__item-bottom-hostname {
-  @apply flex flex-col;
-  width: 20.5%;
-}
-.list__item-bottom-hostname-title {
-  @apply text-xs text-naturals-N12;
-  margin-bottom: 9px;
-}
 .list__item-bottom-clean {
   @apply flex flex-col pl-1;
-  width: 16.5%;
+  width: 20.5%;
 }
 .list__item-bottom-clean-title {
   @apply text-xs text-naturals-N12;
@@ -259,6 +275,7 @@ export default {
 }
 .list__item-bottom-allocated {
   @apply flex flex-col;
+  width: 16.5%;
 }
 .list__item-bottom-allocated-title {
   @apply text-xs text-naturals-N12;
